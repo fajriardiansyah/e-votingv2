@@ -29,13 +29,53 @@
                     </div>
                 @endif
                 
-                {{-- Tombol Utama yang Jelas --}}
-                <div class="mt-8">
-                    <a href="{{ route('voting.form') }}" 
-                       class="inline-flex items-center px-10 py-4 border border-transparent text-xl font-bold rounded-full shadow-2xl text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-4 focus:ring-green-300 transition duration-300 transform hover:scale-105">
-                        🗳️ Berikan Suara Anda Sekarang
-                    </a>
+                {{-- START: LOGIKA STATUS JADWAL VOTING BARU --}}
+                <div class="mt-8 max-w-xl mx-auto">
+                    @php
+                        $now = \Carbon\Carbon::now();
+                        $statusVoting = 'open'; // Default
+                        $statusMessage = '';
+                        $buttonDisabled = false;
+
+                        if (!$activeEvent) {
+                            $statusVoting = 'no_event';
+                            $statusMessage = 'Saat ini tidak ada event pemilihan yang aktif.';
+                            $buttonDisabled = true;
+                        } elseif ($now->lt($activeEvent->tanggal_mulai)) {
+                            $statusVoting = 'soon';
+                            $statusMessage = 'Voting akan dimulai pada: ' . $activeEvent->tanggal_mulai->format('d F Y, H:i') . ' WIB';
+                            $buttonDisabled = true;
+                        } elseif ($now->gt($activeEvent->tanggal_selesai)) {
+                            $statusVoting = 'closed';
+                            $statusMessage = 'Voting telah berakhir pada: ' . $activeEvent->tanggal_selesai->format('d F Y, H:i') . ' WIB';
+                            $buttonDisabled = true;
+                        }
+                    @endphp
+
+                    {{-- Menampilkan pesan status jika tidak 'open' --}}
+                    @if ($statusVoting !== 'open')
+                        <div class="p-4 rounded-lg shadow-inner 
+                            @if($statusVoting === 'soon') bg-amber-100 text-amber-800 border-amber-500 @endif
+                            @if($statusVoting === 'closed' || $statusVoting === 'no_event') bg-red-100 text-red-800 border-red-500 @endif
+                            border-l-4 mb-6">
+                            <p class="font-bold">{{ $statusVoting === 'soon' ? '⏳ Perhatian: Belum Waktunya Memilih' : ($statusVoting === 'closed' ? '⛔ Voting Telah Berakhir' : 'Event Tidak Ditemukan') }}</p>
+                            <p class="text-sm mt-1">{{ $statusMessage }}</p>
+                        </div>
+                    @endif
+                    
+                    {{-- Tombol Utama yang Dinamis --}}
+                    <div class="mt-8">
+                        <a href="{{ route('voting.form') }}" 
+                            class="inline-flex items-center px-10 py-4 border border-transparent text-xl font-bold rounded-full shadow-2xl text-white transition duration-300 transform 
+                                {{ $buttonDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-4 focus:ring-green-300 hover:scale-105' }}"
+                            {{ $buttonDisabled ? 'disabled' : '' }}>
+                            🗳️ {{ $statusVoting === 'open' ? 'Berikan Suara Anda Sekarang' : 
+                                ($statusVoting === 'soon' ? 'Voting Belum Dibuka' : 
+                                ($statusVoting === 'closed' ? 'Voting Selesai' : 'Event Tidak Aktif')) }}
+                        </a>
+                    </div>
                 </div>
+                {{-- END: LOGIKA STATUS JADWAL VOTING BARU --}}
             </div>
             
             {{-- BAGIAN 2: REAL-TIME RESULT (FULL WIDTH) --}}

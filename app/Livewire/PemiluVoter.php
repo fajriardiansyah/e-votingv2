@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+// === START: IMPORTS BARU UNTUK KEAMANAN & TIMING ===
+use Carbon\Carbon; 
+use Illuminate\Support\Facades\RateLimiter; 
+// === END: IMPORTS BARU ===
+
 class PemiluVoter extends Component
 {
     public $activeEvent;
@@ -60,13 +65,26 @@ class PemiluVoter extends Component
             return;
         }
 
+        // === START: LOGIKA BATASAN WAKTU DI MOUNT (Tampilan Awal) ===
+        $now = Carbon::now();
+
+        if ($this->activeEvent->tanggal_mulai && $now->lt($this->activeEvent->tanggal_mulai)) {
+            $this->status = 'event_soon'; // Status baru: Belum Mulai
+            return;
+        }
+        if ($this->activeEvent->tanggal_selesai && $now->gt($this->activeEvent->tanggal_selesai)) {
+            $this->status = 'event_ended'; // Status baru: Sudah Selesai
+            return;
+        }
+        // === END: LOGIKA BATASAN WAKTU DI MOUNT ===
+
         $voterIp = $request->ip();
         $voterDevice = $request->header('User-Agent');
 
         $alreadyVoted = LogSuara::where('pemilu_event_id', $this->activeEvent->id)
-                                ->where('ip_pemilih', $voterIp)
-                                ->where('perangkat_pemilih', $voterDevice)
-                                ->exists();
+                                 ->where('ip_pemilih', $voterIp)
+                                 ->where('perangkat_pemilih', $voterDevice)
+                                 ->exists();
 
         if ($alreadyVoted) {
              $this->status = 'already_voted';
@@ -79,26 +97,63 @@ class PemiluVoter extends Component
 
     public function prosesSuara(Request $request)
     {
-        $this->validate($this->getRules()); 
-        
+        // 1. Cek Event Aktif (Pengecekan di awal untuk keamanan)
         if (!$this->activeEvent) {
             session()->flash('error', 'Event sudah berakhir atau tidak ditemukan.');
             return;
         }
+        
+        // === START: RATE LIMITING (5x per 1 menit) ===
+        $rateLimitKey = $request->ip() . '|pemiluvoter|' . $this->activeEvent->id;
 
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5, 60)) { // Maks 5x per 60 detik
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+            session()->flash('error', "Anda mencoba voting terlalu sering. Harap tunggu {$seconds} detik.");
+            return;
+        }
+        
+        RateLimiter::hit($rateLimitKey); // Mencatat satu attempt
+        // === END: RATE LIMITING ===
+
+        // === START: LOGIKA BATASAN WAKTU VOTING (Server Side Validation) ===
+        $now = Carbon::now();
+
+        // Cek Waktu Mulai
+        if ($this->activeEvent->tanggal_mulai && $now->lt($this->activeEvent->tanggal_mulai)) {
+            $msg = 'Pemilihan Belum Dimulai. Harap tunggu hingga ' . $this->activeEvent->tanggal_mulai->format('d M Y H:i');
+            session()->flash('error', $msg);
+            RateLimiter::clear($rateLimitKey); // Bersihkan limit
+            return;
+        }
+
+        // Cek Waktu Selesai
+        if ($this->activeEvent->tanggal_selesai && $now->gt($this->activeEvent->tanggal_selesai)) {
+            $msg = 'Pemilihan Telah Berakhir pada ' . $this->activeEvent->tanggal_selesai->format('d M Y H:i');
+            session()->flash('error', $msg);
+            RateLimiter::clear($rateLimitKey); // Bersihkan limit
+            return;
+        }
+        // === END: LOGIKA BATASAN WAKTU ===
+        
+        // Lanjutkan Validasi Input Livewire
+        $this->validate($this->getRules()); 
+        
+        // Cek Duplikasi Suara (Logika yang sudah ada)
         $voterIp = $request->ip();
         $voterDevice = $request->header('User-Agent');
         
         $alreadyVoted = LogSuara::where('pemilu_event_id', $this->activeEvent->id)
-                                ->where('ip_pemilih', $voterIp)
-                                ->where('perangkat_pemilih', $voterDevice)
-                                ->exists();
+                                 ->where('ip_pemilih', $voterIp)
+                                 ->where('perangkat_pemilih', $voterDevice)
+                                 ->exists();
 
         if ($alreadyVoted) {
             $this->status = 'already_voted';
+            RateLimiter::clear($rateLimitKey); // Bersihkan limit
             return;
         }
 
+        // --- Penyimpanan DB ---
         DB::beginTransaction();
         try {
             LogSuara::create([
@@ -117,9 +172,8 @@ class PemiluVoter extends Component
             ]);
 
             DB::commit();
+            RateLimiter::clear($rateLimitKey); // Bersihkan limit setelah vote sukses
             $this->status = 'success'; 
-
-            // TIDAK ADA DELAYED REDIRECT DI SINI
             
         } catch (\Exception $e) {
             DB::rollBack();
@@ -129,6 +183,11 @@ class PemiluVoter extends Component
 
     public function render()
     {
-        return view('livewire.pemilu-voter');
+        // Perluas logika render agar bisa menampilkan status baru (event_soon, event_ended)
+        return view('livewire.pemilu-voter', [
+            'proyekLombas' => $this->proyekLombas,
+            'activeEvent' => $this->activeEvent,
+            'status' => $this->status
+        ]);
     }
 }

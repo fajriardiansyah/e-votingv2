@@ -13,10 +13,19 @@ class PemiluEventForm
     {
         return $schema
             ->components([
-                TextInput::make('nama')->required()->maxLength(255)->label('Nama Event'),
-                DateTimePicker::make('tanggal_mulai')->required()->label('Tanggal Mulai'),
-                DateTimePicker::make('tanggal_selesai')->required()->label('Tanggal Selesai'),
-                Toggle::make('aktif')->required()->label('Event Aktif Saat Ini')
+                TextInput::make('nama')
+                    ->required()
+                    ->maxLength(255)
+                    ->label('Nama Event'),
+                DateTimePicker::make('tanggal_mulai')
+                    ->required()
+                    ->label('Tanggal Mulai'),
+                DateTimePicker::make('tanggal_selesai')
+                    ->required()
+                    ->label('Tanggal Selesai'),
+                Toggle::make('aktif')
+                    ->required()
+                    ->label('Event Aktif Saat Ini')
                     ->helperText('Hanya satu event yang boleh aktif pada satu waktu.'),
             ]);
     }

@@ -19,7 +19,32 @@
             </div>
         @endif
 
-        @if ($status === 'no_event')
+        {{-- ================================================================= --}}
+        {{-- START: LOGIKA STATUS (Waktu dan Ketersediaan) --}}
+        {{-- ================================================================= --}}
+        
+        @if ($status === 'event_soon')
+            <div class="text-center py-12 bg-yellow-50 rounded-xl border-l-8 border-yellow-500 shadow-md">
+                <h2 class="text-3xl font-bold text-yellow-800">⏳ Pemilihan Belum Dimulai</h2>
+                @if ($activeEvent->tanggal_mulai)
+                    <p class="text-gray-700 mt-3 text-lg">Anda dapat mulai memilih pada:</p>
+                    <p class="text-2xl font-extrabold text-yellow-700 mt-1">{{ \Carbon\Carbon::parse($activeEvent->tanggal_mulai)->format('d F Y') }} Pukul {{ \Carbon\Carbon::parse($activeEvent->tanggal_mulai)->format('H:i') }} WIB</p>
+                @else
+                    <p class="text-gray-600 mt-2">Jadwal mulai belum ditentukan. Silakan hubungi Administrator.</p>
+                @endif
+            </div>
+
+        @elseif ($status === 'event_ended')
+            <div class="text-center py-12 bg-red-50 rounded-xl border-l-8 border-red-500 shadow-md">
+                <h2 class="text-3xl font-bold text-red-800">⛔ Pemilihan Telah Berakhir</h2>
+                @if ($activeEvent->tanggal_selesai)
+                    <p class="text-gray-700 mt-3 text-lg">Voting telah ditutup pada:</p>
+                    <p class="text-2xl font-extrabold text-red-700 mt-1">{{ \Carbon\Carbon::parse($activeEvent->tanggal_selesai)->format('d F Y') }} Pukul {{ \Carbon\Carbon::parse($activeEvent->tanggal_selesai)->format('H:i') }} WIB</p>
+                @endif
+                <p class="text-gray-600 mt-2">Terima kasih atas partisipasi Anda.</p>
+            </div>
+
+        @elseif ($status === 'no_event')
             <div class="text-center py-12 bg-yellow-50 rounded-xl border border-yellow-200">
                 <h2 class="text-2xl font-bold text-yellow-800">Tidak Ada Event Aktif</h2>
                 <p class="text-gray-600 mt-2">Sistem pemilihan sedang tidak tersedia saat ini.</p>
@@ -38,6 +63,7 @@
                 <p class="text-gray-700 mt-3 text-lg">Terima kasih banyak atas partisipasi Anda dalam pemilihan proyek inovasi.</p>
                 
                 <div class="mt-8">
+                    {{-- Tombol kembali untuk status SUCCESS (sama seperti yang sudah Anda miliki) --}}
                     <a href="{{ route('beranda') }}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 transform hover:scale-105">
                         <svg class="-ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2.586l.293.293a1 1 0 001.414 0l7-7a1 1 0 000-1.414l-7-7z" />
@@ -48,6 +74,9 @@
             </div>
 
         @elseif ($status === 'form')
+            {{-- ================================================================= --}}
+            {{-- START: FORMULIR VOTING ANDA YANG ASLI --}}
+            {{-- ================================================================= --}}
             
             <form wire:submit.prevent="prosesSuara">
 
@@ -176,7 +205,6 @@
                                 {{-- AREA FOTO SAMPUL YANG MENGGUNAKAN ROUTE BARU --}}
                                 @if($proyek->foto_sampul)
                                     <div class="mb-4 overflow-hidden rounded-lg shadow-md aspect-video">
-                                        {{-- JALUR FIX: Menggunakan route helper untuk memanggil server Laravel --}}
                                         <img 
                                             src="{{ route('proyek.image', ['filename' => $proyek->foto_sampul]) }}" 
                                             alt="Sampul Proyek {{ $proyek->nama_proyek }}"
@@ -232,6 +260,24 @@
                     </button>
                 @endif
             </form>
+
+            {{-- END: FORMULIR VOTING ANDA YANG ASLI --}}
+            {{-- ================================================================= --}}
         @endif
+
+        {{-- ================================================================= --}}
+        {{-- TOMBOL KEMBALI (Hanya tampil jika BUKAN STATUS 'form' atau 'success') --}}
+        {{-- ================================================================= --}}
+        @if ($status !== 'form' && $status !== 'success')
+            <div class="mt-8 text-center pt-8 border-t border-gray-200">
+                <a href="{{ route('beranda') }}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-150 transform hover:scale-105">
+                    <svg class="-ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2.586l.293.293a1 1 0 001.414 0l7-7a1 1 0 000-1.414l-7-7z" />
+                    </svg>
+                    Kembali ke Halaman Utama
+                </a>
+            </div>
+        @endif
+        
     </div>
 </div>
